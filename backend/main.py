@@ -1,41 +1,31 @@
+# backend/main.py
 from fastapi import FastAPI
 
-app = FastAPI(
-    title="MerchantLens API", description="AI-Powered Insights for Small Sellers"
-)
+app = FastAPI(title="MerchantLens API")
+
+# Functional approach: Dictionary to store merchant data
+merchants = {}  # Key: name, Value: dict with sales list
 
 
-# Basic OOP Class Example: Merchant (encapsulates data)
-class Merchant:
-    def __init__(self, name: str):
-        self._name = name  # Private attribute (encapsulation)
-        self._sales = []  # Will hold sales data later
-
-    def add_sale(self, amount: float):
-        if amount < 0:
-            raise ValueError("Sale amount cannot be negative")
-        self._sales.append(amount)
-
-    def get_total_sales(self) -> float:
-        return sum(self._sales)  # Abstraction: User gets total without seeing list
-
-    def get_name(self) -> str:
-        return self._name
+def add_sale(merchant_name: str, amount: float):
+    if amount < 0:
+        raise ValueError("Sale amount cannot be negative")
+    if merchant_name not in merchants:
+        merchants[merchant_name] = {"sales": []}
+    merchants[merchant_name]["sales"].append(amount)
 
 
-# Root Endpoint
+def get_total_sales(merchant_name: str) -> float:
+    return sum(merchants.get(merchant_name, {"sales": []})["sales"])
+
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to MerchantLens API"}
 
 
-# Example Endpoint: Create a merchant and add mock sale
 @app.get("/merchant/{name}")
 def get_merchant(name: str):
-    merchant = Merchant(name)
-    merchant.add_sale(100.50)  # Mock sale
-    merchant.add_sale(200.75)
-    return {
-        "merchant_name": merchant.get_name(),
-        "total_sales": merchant.get_total_sales(),
-    }
+    add_sale(name, 100.50)  # Mock sale
+    add_sale(name, 200.75)
+    return {"merchant_name": name, "total_sales": get_total_sales(name)}
