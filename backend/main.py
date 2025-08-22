@@ -1,50 +1,18 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse
 import pandas as pd
-from models import Sale
-from models import Review
+from models import Sale, Review
 from typing import List
 import io
-from datetime import datetime
-from textblob import TextBlob
+from analysis import (
+    compute_total_sales,
+    compute_sales_by_product,
+    compute_sales_by_week,
+    compute_review_sentiment,
+    add_sale,
+    add_review,
+)
 
 app = FastAPI(title="MerchantLens API")
-
-# In-memory storage for sales & reviews (SQLite later)
-sales_data: List[Sale] = []
-reviews_data: List[Review] = []
-
-
-# Analysis functions
-def compute_total_sales() -> float:
-    return sum(sale.amount for sale in sales_data)
-
-
-def compute_sales_by_product() -> dict:
-    result = {}
-    for sale in sales_data:
-        result[sale.product] = result.get(sale.product, 0) + sale.amount
-    return result
-
-
-def compute_sales_by_week() -> dict:
-    # Convert sales_data to DataFrame for easier grouping
-    df = pd.DataFrame([sale.model_dump() for sale in sales_data])
-    if df.empty:
-        return {}
-    # Ensure date is datetime
-    df["date"] = pd.to_datetime(df["date"])
-    # Group by week (using ISO week number)
-    df["week"] = df["date"].dt.isocalendar().week
-    df["year"] = df["date"].dt.year
-    # Sum amounts by year and week
-    weekly_sales = df.groupby(["year", "week"])["amount"].sum().to_dict()
-    # Format as "YYYY-WW": amount
-    result = {
-        f"{year}-W{week:02d}": round(amount, 2)
-        for (year, week), amount in weekly_sales.items()
-    }
-    return result
 
 
 # Root endpoint
@@ -69,7 +37,7 @@ async def upload_sales(file: UploadFile = File(...)):
                 product=row["product"],
                 amount=float(row["amount"]),
             )
-            sales_data.append(sale)
+            add_sale(sale)
         return {"message": f"Uploaded {len(df)} sales records"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error processing CSV: {str(e)}")
@@ -109,28 +77,10 @@ async def upload_reviews(file: UploadFile = File(...)):
                 text=row["text"],
                 rating=int(row["rating"]) if pd.notna(row["rating"]) else None,
             )
-            reviews_data.append(review)
+            add_review(review)
         return {"message": f"Uploaded {len(df)} review records"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error processing CSV: {str(e)}")
-
-
-# Sentiment analysis function
-def compute_review_sentiment() -> dict:
-    result = {}
-    for review in reviews_data:
-        blob = TextBlob(review.text)
-        sentiment = blob.sentiment.polarity  # -1 (negative) to 1 (positive)
-        result[review.text] = {
-            "product": review.product,
-            "sentiment": (
-                "positive"
-                if sentiment > 0
-                else "negative" if sentiment < 0 else "neutral"
-            ),
-            "polarity": round(sentiment, 2),
-        }
-    return result
 
 
 @app.get("/reviews/sentiment")
