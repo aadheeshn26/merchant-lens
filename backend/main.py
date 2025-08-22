@@ -2,14 +2,17 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import pandas as pd
 from models import Sale
+from models import Review
 from typing import List
 import io
 from datetime import datetime
+from textblob import TextBlob
 
 app = FastAPI(title="MerchantLens API")
 
-# In-memory storage for sales (SQLite later)
+# In-memory storage for sales & reviews (SQLite later)
 sales_data: List[Sale] = []
+reviews_data: List[Review] = []
 
 
 # Analysis functions
@@ -89,3 +92,47 @@ def get_sales_by_product():
 @app.get("/sales/by-week")
 def get_sales_by_week():
     return compute_sales_by_week()
+
+
+# Upload reviews endpoint
+@app.post("/upload-reviews")
+async def upload_reviews(file: UploadFile = File(...)):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    try:
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+        for _, row in df.iterrows():
+            review = Review(
+                date=pd.to_datetime(row["date"]),
+                product=row["product"],
+                text=row["text"],
+                rating=int(row["rating"]) if pd.notna(row["rating"]) else None,
+            )
+            reviews_data.append(review)
+        return {"message": f"Uploaded {len(df)} review records"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error processing CSV: {str(e)}")
+
+
+# Sentiment analysis function
+def compute_review_sentiment() -> dict:
+    result = {}
+    for review in reviews_data:
+        blob = TextBlob(review.text)
+        sentiment = blob.sentiment.polarity  # -1 (negative) to 1 (positive)
+        result[review.text] = {
+            "product": review.product,
+            "sentiment": (
+                "positive"
+                if sentiment > 0
+                else "negative" if sentiment < 0 else "neutral"
+            ),
+            "polarity": round(sentiment, 2),
+        }
+    return result
+
+
+@app.get("/reviews/sentiment")
+def get_review_sentiment():
+    return compute_review_sentiment()
