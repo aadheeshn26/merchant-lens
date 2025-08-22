@@ -4,6 +4,7 @@ import pandas as pd
 from models import Sale
 from typing import List
 import io
+from datetime import datetime
 
 app = FastAPI(title="MerchantLens API")
 
@@ -20,6 +21,26 @@ def compute_sales_by_product() -> dict:
     result = {}
     for sale in sales_data:
         result[sale.product] = result.get(sale.product, 0) + sale.amount
+    return result
+
+
+def compute_sales_by_week() -> dict:
+    # Convert sales_data to DataFrame for easier grouping
+    df = pd.DataFrame([sale.model_dump() for sale in sales_data])
+    if df.empty:
+        return {}
+    # Ensure date is datetime
+    df["date"] = pd.to_datetime(df["date"])
+    # Group by week (using ISO week number)
+    df["week"] = df["date"].dt.isocalendar().week
+    df["year"] = df["date"].dt.year
+    # Sum amounts by year and week
+    weekly_sales = df.groupby(["year", "week"])["amount"].sum().to_dict()
+    # Format as "YYYY-WW": amount
+    result = {
+        f"{year}-W{week:02d}": round(amount, 2)
+        for (year, week), amount in weekly_sales.items()
+    }
     return result
 
 
@@ -62,3 +83,9 @@ def get_total_sales():
 @app.get("/sales/by-product")
 def get_sales_by_product():
     return compute_sales_by_product()
+
+
+# Sales analysis by week
+@app.get("/sales/by-week")
+def get_sales_by_week():
+    return compute_sales_by_week()

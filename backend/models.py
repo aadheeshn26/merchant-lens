@@ -28,3 +28,24 @@ class Sale(BaseModel):
         if v > datetime.now():
             raise ValueError("Date cannot be in the future")
         return v
+
+
+class Review(BaseModel):
+    date: datetime
+    product: str
+    text: str
+    rating: Optional[int] = None  # Optional, 1-5 stars
+
+    @field_validator("text")
+    @classmethod
+    def text_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Review text cannot be empty")
+        return v.strip()
+
+    @field_validator("rating")
+    @classmethod
+    def rating_must_be_valid(cls, v):
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("Rating must be between 1 and 5")
+        return v
