@@ -1,31 +1,64 @@
-# backend/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+import pandas as pd
+from models import Sale
+from typing import List
+import io
 
 app = FastAPI(title="MerchantLens API")
 
-# Functional approach: Dictionary to store merchant data
-merchants = {}  # Key: name, Value: dict with sales list
+# In-memory storage for sales (SQLite later)
+sales_data: List[Sale] = []
 
 
-def add_sale(merchant_name: str, amount: float):
-    if amount < 0:
-        raise ValueError("Sale amount cannot be negative")
-    if merchant_name not in merchants:
-        merchants[merchant_name] = {"sales": []}
-    merchants[merchant_name]["sales"].append(amount)
+# Analysis functions
+def compute_total_sales() -> float:
+    return sum(sale.amount for sale in sales_data)
 
 
-def get_total_sales(merchant_name: str) -> float:
-    return sum(merchants.get(merchant_name, {"sales": []})["sales"])
+def compute_sales_by_product() -> dict:
+    result = {}
+    for sale in sales_data:
+        result[sale.product] = result.get(sale.product, 0) + sale.amount
+    return result
 
 
+# Root endpoint
 @app.get("/")
 def read_root():
     return {"message": "Welcome to MerchantLens API"}
 
 
-@app.get("/merchant/{name}")
-def get_merchant(name: str):
-    add_sale(name, 100.50)  # Mock sale
-    add_sale(name, 200.75)
-    return {"merchant_name": name, "total_sales": get_total_sales(name)}
+# Upload CSV endpoint
+@app.post("/upload-sales")
+async def upload_sales(file: UploadFile = File(...)):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    try:
+        # Read CSV into pandas DataFrame
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+        # Validate and convert to Sale objects
+        for _, row in df.iterrows():
+            sale = Sale(
+                date=pd.to_datetime(row["date"]),
+                product=row["product"],
+                amount=float(row["amount"]),
+            )
+            sales_data.append(sale)
+        return {"message": f"Uploaded {len(df)} sales records"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error processing CSV: {str(e)}")
+
+
+# Get request total sales
+@app.get("/sales/total")
+def get_total_sales():
+    total = compute_total_sales()
+    return {"total_sales": round(total, 2)}
+
+
+# Get request for total sales for single product
+@app.get("/sales/by-product")
+def get_sales_by_product():
+    return compute_sales_by_product()
