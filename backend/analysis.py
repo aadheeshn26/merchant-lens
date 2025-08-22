@@ -17,6 +17,7 @@ def add_review(review: Review):
     reviews_data.append(review)
 
 
+# Analysis functions
 def compute_total_sales() -> float:
     return sum(sale.amount for sale in sales_data)
 

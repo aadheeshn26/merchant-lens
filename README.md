@@ -4,7 +4,7 @@ AI-Powered Business Insights & Assistant for Small Online Sellers
 
 ## Project Overview
 
-MerchantLens is an AI-powered assistant designed to empower small online sellers (e.g., on Etsy, Gumroad, or Instagram shops) by analyzing sales data, customer reviews, and traffic to provide actionable insights. It offers sales trend analysis, sentiment analysis on reviews, and will include machine learning-driven recommendations for pricing, product bundling, and SEO-optimized product listings. Built with a modular architecture inspired by Shopify’s admin ecosystem, it features a FastAPI backend, React frontend (in progress), and AI integrations.
+MerchantLens is an AI-powered assistant designed to empower small online sellers (e.g., on Etsy, Gumroad, or Instagram shops) by analyzing sales data, customer reviews, and traffic to provide actionable insights. It offers sales trend analysis, sentiment analysis on reviews, and will include machine learning-driven recommendations for pricing, product bundling, and SEO-optimized product listings. Built with a modular architecture inspired by Shopify’s admin ecosystem, it features a FastAPI backend, Remix.js frontend (in progress), and AI integrations. The goal is a modular, Shopify-aligned MVP, as I'm currently recruiting for a Winter 2026 Engineering Internship there
 
 ## Features
 
