@@ -7,6 +7,7 @@ backports-datetime-fromisoformat==2.0.3
 certifi==2025.8.3
 charset-normalizer==3.4.3
 click==8.1.8
+distro==1.9.0
 dm-tree==0.1.9
 docstring_parser==0.17.0
 einops==0.8.1
@@ -23,9 +24,12 @@ googleapis-common-protos==1.70.0
 grpcio==1.74.0
 h11==0.16.0
 h5py==3.14.0
+httpcore==1.0.9
+httpx==0.28.1
 idna==3.10
 immutabledict==4.2.1
 importlib_resources==6.5.2
+jiter==0.10.0
 joblib==1.5.1
 keras==3.11.3
 libclang==18.1.1
@@ -38,6 +42,7 @@ ml-dtypes==0.3.2
 namex==0.1.0
 nltk==3.9.1
 numpy==1.26.4
+openai==1.101.0
 opt_einsum==3.4.0
 optree==0.17.0
 packaging==25.0

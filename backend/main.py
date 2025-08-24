@@ -13,6 +13,7 @@ from analysis import (
 from recommendations import get_recommendations
 from fastapi.middleware.cors import CORSMiddleware
 import io
+from nlp import process_query
 
 app = FastAPI(title="MerchantLens API")
 
@@ -100,3 +101,8 @@ def get_review_sentiment():
 @app.get("/recommendations/pricing")
 def get_pricing_recommendations():
     return get_recommendations()
+
+
+@app.post("/nlp/query")
+async def process_nlp_query(query: str):
+    return process_query(query)
