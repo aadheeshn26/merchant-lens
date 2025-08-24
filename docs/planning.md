@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MerchantLens is an AI-powered assistant for small online sellers (Etsy, Gumroad, Instagram shops) to analyze sales, reviews, and traffic, delivering insights via a natural language interface. It provides sales analytics, sentiment analysis, deep learning-based recommendations, and SEO-optimized product listings. The goal is a modular, Shopify-aligned MVP for my internship application’s behavioral interview.
+MerchantLens is an AI-powered assistant for small online sellers (Etsy, Gumroad, Instagram shops) to analyze sales, reviews, and traffic, delivering insights via a natural language interface. It provides sales analytics, sentiment analysis, deep learning-based recommendations, and SEO-optimized product listings. The goal is a modular, Shopify-aligned MVP for my internship application’s behavioral interview (lifestory).
 
 ## Core Features (MVP)
 

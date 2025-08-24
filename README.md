@@ -1,6 +1,6 @@
 # MerchantLens
 
-AI-Powered Business Insights & Assistant for Small Online Sellers
+AI-Powered Business Insights & Assistant for Small Online Sellers - think Shopify Sidekick, but generalized for small online sellers.
 
 ## Project Overview
 
