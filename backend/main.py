@@ -2,7 +2,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 import pandas as pd
 from models import Sale, Review
 from typing import List
-import io
 from analysis import (
     compute_total_sales,
     compute_sales_by_product,
@@ -11,8 +10,18 @@ from analysis import (
     add_sale,
     add_review,
 )
+from recommendations import get_recommendations
+from fastapi.middleware.cors import CORSMiddleware
+import io
 
 app = FastAPI(title="MerchantLens API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Root endpoint
@@ -86,3 +95,8 @@ async def upload_reviews(file: UploadFile = File(...)):
 @app.get("/reviews/sentiment")
 def get_review_sentiment():
     return compute_review_sentiment()
+
+
+@app.get("/recommendations/pricing")
+def get_pricing_recommendations():
+    return get_recommendations()
