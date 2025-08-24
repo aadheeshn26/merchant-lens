@@ -33,10 +33,4 @@ MerchantLens is an AI-powered assistant designed to empower small online sellers
 
 ## Demo
 
-(TBD: Screenshots and demo video will be added after frontend completion in Week 2-3)
-
-## Development Progress
-
-- **Week 1, Day 1**: Initialized GitHub repo, set up FastAPI backend with basic endpoints.
-- **Week 1, Day 2**: Added CSV upload for sales data, `Sale` model, and basic analysis (total sales, by product).
-- **Week 1, Day 3**: Implemented weekly sales trends and sentiment analysis with `Review` model.
+(TBD: Screenshots and demo video will be added after frontend completion)
