@@ -82,6 +82,40 @@ target/
 profile_default/
 ipython_config.py
 
+# Python/Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv*/
+*.egg-info/
+*.egg
+dist/
+build/
+*.log
+.env
+.venv/
+
+# Node.js/Frontend
+frontend/node_modules/
+frontend/.cache/
+frontend/build/
+frontend/public/build/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/.remix/
+
+# General
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.idea/
+.vscode/
+*.log
+npm-debug.log*
+
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
