@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import Depends
 from typing import Dict
+from textblob import TextBlob
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
