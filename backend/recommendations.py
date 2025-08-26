@@ -1,130 +1,86 @@
 import tensorflow as tf
-import numpy as np
-from typing import Dict
+import tensorflow_recommenders as tfrs
+from analysis import get_sales_data
+from database import SessionLocal, get_db
+from sqlalchemy.orm import Session
+from typing import Dict, List
 from collections import Counter
-from models import Sale
-from analysis import sales_data
+from fastapi import Depends
 
-
-def analyze_sales_patterns() -> Dict[str, any]:
-    """Analyze sales patterns to generate recommendations using simple statistics"""
-    if not sales_data:
-        return {"product_popularity": {}, "weekly_trends": {}, "product_cooccurrence": {}}
-    
-    # Product popularity (total sales count and revenue)
-    product_stats = {}
-    weekly_sales = {}
-    
-    for sale in sales_data:
-        product = sale.product
-        week = sale.date.isocalendar().week
+# Define the model with proper TensorFlow Recommenders setup
+class RecommendationModel(tfrs.Model):
+    def __init__(self, unique_products: List[str]):
+        super().__init__()
+        self.product_vocabulary = unique_products
+        self.product_model = tf.keras.Sequential([
+            tf.keras.layers.StringLookup(vocabulary=unique_products, mask_token=None),
+            tf.keras.layers.Embedding(len(unique_products) + 1, 64),
+        ])
         
-        # Product statistics
-        if product not in product_stats:
-            product_stats[product] = {"count": 0, "revenue": 0.0, "weeks": set()}
-        product_stats[product]["count"] += 1
-        product_stats[product]["revenue"] += sale.amount
-        product_stats[product]["weeks"].add(week)
+        # Create candidate embeddings for retrieval
+        self.candidate_model = tf.keras.Sequential([
+            tf.keras.layers.StringLookup(vocabulary=unique_products, mask_token=None),
+            tf.keras.layers.Embedding(len(unique_products) + 1, 64),
+        ])
         
-        # Weekly trends
-        week_key = f"Week-{week}"
-        if week_key not in weekly_sales:
-            weekly_sales[week_key] = {}
-        if product not in weekly_sales[week_key]:
-            weekly_sales[week_key][product] = 0
-        weekly_sales[week_key][product] += 1
-    
-    # Convert sets to counts for JSON serialization
-    for product in product_stats:
-        product_stats[product]["active_weeks"] = len(product_stats[product]["weeks"])
-        del product_stats[product]["weeks"]
-    
-    # Product co-occurrence (products bought in same week)
-    cooccurrence = {}
-    for week_data in weekly_sales.values():
-        products_in_week = list(week_data.keys())
-        for i, product_a in enumerate(products_in_week):
-            if product_a not in cooccurrence:
-                cooccurrence[product_a] = Counter()
-            for j, product_b in enumerate(products_in_week):
-                if i != j:  # Don't count self-occurrence
-                    cooccurrence[product_a][product_b] += 1
-    
-    # Convert Counter objects to regular dicts for JSON serialization
-    cooccurrence = {k: dict(v) for k, v in cooccurrence.items()}
-    
-    return {
-        "product_popularity": product_stats,
-        "weekly_trends": weekly_sales,
-        "product_cooccurrence": cooccurrence
-    }
+        # Use retrieval task without problematic metrics
+        self.task = tfrs.tasks.Retrieval()
+        
+    def call(self, features):
+        return self.product_model(features["product"])
 
+    def compute_loss(self, features: Dict[str, tf.Tensor], training=False) -> tf.Tensor:
+        query_embeddings = self.product_model(features["product"])
+        candidate_embeddings = self.candidate_model(features["product"])
+        return self.task(query_embeddings, candidate_embeddings)
 
-def get_recommendations(top_k: int = 3) -> Dict[str, any]:
-    """Generate recommendations based on sales patterns and popularity"""
-    if not sales_data:
-        return {
-            "recommendations": [],
-            "pricing_suggestions": {},
-            "message": "No sales data available for recommendations"
-        }
+def get_recommendations(db: Session = Depends(get_db)) -> Dict:
+    # Fetch sales data from SQLite
+    sales = get_sales_data(db)
+    if not sales:
+        return {"recommendations": [], "pricing_suggestions": {}}
+
+    # Extract products and count popularity
+    products = [sale.product for sale in sales]
+    product_counts = Counter(products)
+    unique_products = list(set(products))
+
+    # Train TFRS model
+    model = RecommendationModel(unique_products)
+    tf_dataset = tf.data.Dataset.from_tensor_slices({"product": products})
+    tf_dataset = tf_dataset.shuffle(len(products)).batch(32).cache()
+
+    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
+    model.fit(tf_dataset, epochs=1, verbose=0)
+
+    # Get embeddings for all unique products
+    product_embeddings = model({"product": tf.constant(unique_products)})
     
-    patterns = analyze_sales_patterns()
-    product_stats = patterns["product_popularity"]
-    cooccurrence = patterns["product_cooccurrence"]
-    
-    # Get top products by revenue (primary recommendation)
-    top_by_revenue = sorted(
-        product_stats.items(),
-        key=lambda x: x[1]["revenue"],
-        reverse=True
-    )[:top_k]
-    
-    # Get recommendations based on co-occurrence patterns
-    cooccurrence_recs = []
-    if cooccurrence:
-        # Find the most sold product and its co-occurring products
-        most_sold_product = max(product_stats.keys(), key=lambda p: product_stats[p]["count"])
-        if most_sold_product in cooccurrence:
-            cooccurrence_recs = sorted(
-                cooccurrence[most_sold_product].items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:top_k]
-    
-    # Combine and deduplicate recommendations
-    all_recommendations = set()
-    
-    # Add top revenue products
-    for product, stats in top_by_revenue:
-        all_recommendations.add(product)
-    
-    # Add co-occurrence based recommendations
-    for product, count in cooccurrence_recs:
-        all_recommendations.add(product)
-    
-    # Convert to list and limit to top_k
-    recommendations = list(all_recommendations)[:top_k]
-    
-    # Generate pricing suggestions based on product performance
+    # Calculate similarity scores and get top recommendations
+    similarity_scores = tf.linalg.norm(product_embeddings, axis=1)
+    top_indices = tf.nn.top_k(similarity_scores, k=min(3, len(unique_products))).indices
+    top_recommendations = [unique_products[i] for i in top_indices.numpy()]
+
+    # Enhanced bundle pricing logic
     pricing_suggestions = {}
-    for product in recommendations:
-        stats = product_stats.get(product, {})
-        avg_revenue = stats.get("revenue", 0) / max(stats.get("count", 1), 1)
-        
-        if avg_revenue > 50:
-            pricing_suggestions[product] = "Premium product - consider premium bundle pricing"
-        elif avg_revenue > 20:
-            pricing_suggestions[product] = "Popular item - offer 5% bundle discount"
-        else:
-            pricing_suggestions[product] = "Value item - consider 10% volume discount"
-    
+    # Count co-occurrences of products in sales (e.g., same day)
+    product_pairs = Counter()
+    for i in range(len(sales) - 1):
+        for j in range(i + 1, len(sales)):
+            if sales[i].date == sales[j].date:  # Same day purchase
+                pair = tuple(sorted([sales[i].product, sales[j].product]))
+                product_pairs[pair] += 1
+
+    for (prod1, prod2), count in product_pairs.most_common(2):  # Top 2 pairs
+        if count > 1:
+            base_price1 = next((s.amount for s in sales if s.product == prod1), 0)
+            base_price2 = next((s.amount for s in sales if s.product == prod2), 0)
+            total_price = base_price1 + base_price2
+            # Tiered discount: 10% for 2+ occurrences, 15% for 5+
+            discount = total_price * (0.15 if count >= 5 else 0.10)
+            pricing_suggestions[f"{prod1} + {prod2}"] = f"Bundle price: ${total_price - discount:.2f} (save ${discount:.2f}, {count} times bought together)"
+
     return {
-        "recommendations": recommendations,
-        "pricing_suggestions": pricing_suggestions,
-        "analysis": {
-            "total_products": len(product_stats),
-            "top_revenue_product": max(product_stats.keys(), key=lambda p: product_stats[p]["revenue"]) if product_stats else None,
-            "most_frequent_product": max(product_stats.keys(), key=lambda p: product_stats[p]["count"]) if product_stats else None
-        }
+        "recommendations": top_recommendations,
+        "pricing_suggestions": pricing_suggestions
     }
